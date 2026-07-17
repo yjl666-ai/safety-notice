@@ -1,0 +1,23 @@
+# Docker build 时排除
+venv/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+.secrets/
+ui.log
+*.log
+*.docx
+*.tmp
+get-pip.py
+docs/
+scripts/
+README.md
+LICENSE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+examples/
+output/
