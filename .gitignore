@@ -32,3 +32,8 @@ Thumbs.db
 # 临时文件
 get-pip.py
 *.tmp
+
+# 应用生成 + 日志(不入库)
+ui.log
+notice.yaml
+main

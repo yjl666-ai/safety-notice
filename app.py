@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-app.py — 智安通 Web UI
+app.py — 智安通 Web UI (多隐患版本)
 
 用法:
     ./venv/bin/python app.py
@@ -34,10 +34,10 @@ INDEX_HTML = """
     .sub { color: #6b7280; margin: 0 0 24px; font-size: 14px; }
     .row { margin-bottom: 16px; }
     label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
-    textarea { width: 100%; min-height: 90px; padding: 12px;
+    textarea { width: 100%; min-height: 140px; padding: 12px;
               font-size: 14px; border-radius: 8px;
               border: 1px solid #d1d5db; font-family: inherit;
-              resize: vertical; }
+              resize: vertical; line-height: 1.6; }
     textarea:focus { outline: none; border-color: #2563eb;
                      box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
@@ -70,11 +70,15 @@ INDEX_HTML = """
 </head>
 <body>
   <h1>🔧 智安通 <span style="font-size:18px; color:#9ca3af">Safety Notice AI</span></h1>
-  <p class="sub">施工现场安全隐患整改通知书 · 智能生成器</p>
+  <p class="sub">施工现场安全隐患整改通知书 · 多隐患智能生成器</p>
 
   <div class="row">
-    <label>隐患描述 <span class="hint">(一句话,越具体 AI 写得越准)</span></label>
-    <textarea id="hazard" placeholder="例: 电线泡水未及时处理  /  高处作业未系安全带  /  基坑边坡堆土超载"></textarea>
+    <label>隐患描述 <span class="hint">(每行一条,1-6 条;AI 会融合成一段描述 + 针对性整改)</span></label>
+    <textarea id="hazards" placeholder="例:
+电线泡水未及时处理
+高处作业未系安全带
+基坑边坡堆土超载
+灭火器失效"></textarea>
   </div>
 
   <div class="actions">
@@ -89,7 +93,7 @@ INDEX_HTML = """
   <div class="hint">通知内容 ↓(可复制 / 可滚动)</div>
   <pre id="output" class="output"></pre>
 
-  <div class="footer">智安通 v0.2 · Flask UI · MIT</div>
+  <div class="footer">智安通 v0.3 · Flask UI · MIT · 多隐患版本</div>
 
   <script>
     function status(msg, kind='info') {
@@ -102,23 +106,28 @@ INDEX_HTML = """
       document.getElementById('btn-ai').disabled = b;
       document.getElementById('btn-docx').disabled = b;
     }
+    function parseHazards() {
+      const raw = document.getElementById('hazards').value;
+      return raw.split('\\n').map(s => s.trim()).filter(Boolean);
+    }
     async function aiSuggest() {
-      const hazard = document.getElementById('hazard').value.trim();
-      if (!hazard) { status('⚠ 请先输入隐患描述', 'error'); return; }
+      const hazards = parseHazards();
+      if (hazards.length === 0) { status('⚠ 请先输入至少一条隐患描述', 'error'); return; }
+      if (hazards.length > 6) { status('⚠ 一次最多 6 条,请精简', 'error'); return; }
       setBusy(true);
-      status('🤖 AI 在思考中... 通常 5-10 秒', 'info');
+      status(`🤖 AI 在思考中... (${hazards.length} 条隐患,通常 5-15 秒)`, 'info');
       document.getElementById('output').style.display = 'none';
       try {
         const r = await fetch('/api/ai', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({hazard}),
+          body: JSON.stringify({hazards}),
         });
         const d = await r.json();
         if (d.error) { status('❌ ' + d.error, 'error'); return; }
         document.getElementById('output').textContent = d.text;
         document.getElementById('output').style.display = 'block';
-        status('✅ 通知已生成。可以复制,或者点"生成 docx"出 Word', 'success');
+        status(`✅ 通知已生成 (${hazards.length} 条隐患 → 1 段描述 + ${hazards.length} 条针对性整改)`, 'success');
       } catch (e) {
         status('❌ 网络错误:' + e, 'error');
       } finally {
@@ -161,27 +170,33 @@ def index():
 def api_ai():
     try:
         data = request.get_json(silent=True) or {}
-        hazard = (data.get('hazard') or '').strip()
-        if not hazard:
+        hazards = data.get('hazards') or []
+        if isinstance(hazards, str):
+            # 兼容旧版单字符串调用
+            hazards = [s.strip() for s in hazards.split('\n') if s.strip()]
+        hazards = [s for s in (str(h).strip() for h in hazards) if s]
+        if not hazards:
             return jsonify({'error': '隐患描述为空'}), 400
+        if len(hazards) > 6:
+            return jsonify({'error': '一次最多 6 条隐患'}), 400
 
-        # 调 ai_suggest.py (stdin 喂 hazard)
+        # 调 ai_suggest.py (stdin 喂 hazards,每行一条)
         proc = subprocess.run(
             [sys.executable, str(HERE / 'ai_suggest.py')],
-            input=hazard,
+            input='\n'.join(hazards),
             capture_output=True,
             text=True,
             cwd=str(HERE),
-            timeout=60,
+            timeout=90,
             env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
         )
 
         if proc.returncode != 0:
             return jsonify({'error': proc.stderr.strip() or 'AI 调用失败'}), 500
 
-        return jsonify({'text': proc.stdout})
+        return jsonify({'text': proc.stdout, 'count': len(hazards)})
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'AI 思考超时(60s)'}), 504
+        return jsonify({'error': 'AI 思考超时(90s)'}), 504
     except Exception as e:
         return jsonify({'error': f'服务器错误:{e}'}), 500
 
@@ -234,5 +249,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
     print(f'\n✅ 智安通 UI 已启动:')
     print(f'   浏览器打开: http://localhost:{port}\n')
-    # debug=False 避免 Flask 自带 reloader 干扰后台
     app.run(host=host, port=port, debug=False, use_reloader=False)

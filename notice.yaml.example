@@ -1,34 +1,64 @@
-# ─────────────────────────────────────────
-# 安全隐患整改通知书 - 输入配置样例
-# ─────────────────────────────────────────
-# 用法:
-#   手动模式: cp 这个为 notice.yaml,自己填字段
-#   AI 模式:   ai_suggest.py "隐患描述" 会自动覆盖 notice.yaml
+# 智安通 · notice.yaml 示例
+#
+# 由 ai_suggest.py 自动生成(多隐患输入 → 1 段描述 + N 条针对性整改)
+# 你也可以手填这个 YAML,然后跑:
+#   python generate_notice.py notice.yaml 整改通知.docx
+#
+# 字段说明:
+#   title:           通知标题
+#   to_unit:         被通知单位
+#   from_unit:       发文单位(安监部/项目部)
+#   issue_date:      发文日期
+#   context:         巡检背景(日常巡检/专项检查/月度大检查 等)
+#   hazards_input:   原始隐患列表(供审计留档,1-6 条)
+#   hazard_paragraph:一段话主体(已含日期、单位、违规条款等,不要换行)
+#   location:        综合位置描述
+#   regulation_name: 适用的规范(可多个,带《》,用"、"分隔)
+#   regulation_code: 编号(可多个,用"、"分隔)
+#   violation_clause:具体违反的条款(可多个,用"、"分隔)
+#   requirements:    N 条针对性整改(与 hazards_input 一一对应,**不要写通用整改**)
+#   deadline_days:   整改期限(天)
+#   penalty_doc:     处罚依据文件
+#   penalty:         处罚方式
+#   doc_number:      文号(可选,留空)
+#   photos:          4 个占位 ["图1","图2","图3","图4"],实际贴图时人工替换
 
-to_unit: "XX项目部"          # ← 手动改
-from_unit: "安监部"
-issue_date: "2026年7月17日"
-doc_number: "安监〔2026〕第XXX号"
+title: 安全隐患整改通知书
+to_unit: XX 项目部
+from_unit: 安监部
+issue_date: 2026年7月19日
+context: 日常巡检
 
-location: "施工现场临时用电区域"
-context: "日常巡检"
+hazards_input:
+  - 电线泡水未及时处理
+  - 高处作业未系安全带
+  - 基坑边坡堆土超载
+  - 灭火器失效
 
-regulation_name: "施工现场临时用电安全技术规范"
-regulation_code: "JGJ 46-2005"
-regulation_figures: "1"      # 引用规范的图号,留空为 ""
+location: 施工现场临时用电区及周边
+regulation_name: 《建筑施工安全检查标准》
+regulation_code: JGJ 59-2011
+violation_clause: 第3.1.3条等
 
-hazard: "电线泡水"
-hazard_figures: "2、3"        # 隐患照片图号,留空为 ""
+hazard_paragraph: >-
+  2026年7月19日,安监部于日常巡检中,发现你单位施工现场临时用电区及周边存在多处安全隐患,
+  具体表现为:电线泡水未及时处理;同时,高处作业人员未按规定佩戴安全带;
+  此外,基坑边坡堆土已超过设计荷载;另外,材料库灭火器压力不足。
+  上述行为违反《建筑施工安全检查标准》(JGJ 59-2011)第3.1.3条等规定,未及时整改。
 
 requirements:
-  - "立即切断泡水区域电源,拆除受水浸泡的电线,干燥或更换受损线路"
-  - "全面排查现场临时用电线路,必须架空敷设或穿管保护,严禁拖地、泡水"
-  - "严格执行《施工现场临时用电安全技术规范》(JGJ 46-2005)第7章用电线路相关规定,加强临时用电日常巡检"
+  - 立即切断电源,移除泡水电线,由专业电工检测合格后恢复供电。
+  - 立即停止该处高处作业,作业人员规范佩戴安全带后方可复工。
+  - 24 小时内清除超载土方,基坑边坡 2 米范围内严禁堆载。
+  - 3 日内更换失效灭火器,建立每周检查制度。
 
 deadline_days: 3
-penalty_doc: "施工现场奖惩实施细则"
-penalty: "违约扣款"
+penalty_doc: 施工现场奖惩实施细则
+penalty: 违约扣款
+doc_number: ""
 
-# 可选字段(留空走默认)
-review_clause: ""          # 默认: "安监部将于整改完成后组织复查"
-feedback_clause: ""         # 默认: "并将整改结果书面报安监部"
+photos:
+  - 图1
+  - 图2
+  - 图3
+  - 图4
