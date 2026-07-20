@@ -17,8 +17,11 @@ from pathlib import Path
 from flask import Flask, request, jsonify, render_template_string
 from werkzeug.utils import secure_filename
 
+import db  # 数据库模块
+
 HERE = Path(__file__).parent.resolve()
 os.chdir(HERE)
+db.init_db()  # 启动时自动建表
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB 上传限制
@@ -156,7 +159,7 @@ INDEX_HTML = r"""
   <div class="hint">通知内容 ↓(可复制 / 可滚动)</div>
   <pre id="output" class="output"></pre>
 
-  <div class="footer">智安通 v0.4.1 · Flask UI · MIT · 文本 + 照片双模式</div>
+  <div class="footer">智安通 v0.5 · Flask UI · MIT · <a href="/history">📋 历史记录</a></div>
 
   <script>
     // ── 模式切换 ──
@@ -346,6 +349,8 @@ def api_ai():
         )
         if proc.returncode != 0:
             return jsonify({'error': proc.stderr.strip() or 'AI 调用失败'}), 500
+        # 存档到数据库
+        db.save_notice("", "text", hazards, proc.stdout)
         return jsonify({'text': proc.stdout, 'count': len(hazards)})
     except subprocess.TimeoutExpired:
         return jsonify({'error': 'AI 思考超时(90s)'}), 504
@@ -391,7 +396,13 @@ def api_photos():
 
         # 统计成功识别的隐患条数
         count = sum(1 for ln in proc.stderr.split('\n') if ln.startswith('✓ ['))
-
+        # 从 stderr 提取隐患描述（格式: "✓ [1/3] file.jpg: 隐患描述..."）
+        hazards = []
+        for ln in proc.stderr.split('\n'):
+            if ln.startswith('✓ [') and ': ' in ln:
+                hazards.append(ln.split(': ', 1)[1].strip())
+        # 存档到数据库
+        db.save_notice("", "photos", hazards or [f"{count}条隐患"], proc.stdout, photo_count=count)
         return jsonify({'text': proc.stdout, 'count': count})
     except subprocess.TimeoutExpired:
         return jsonify({'error': 'AI 思考超时(120s)'}), 504
@@ -425,6 +436,55 @@ def api_docx():
         })
     except Exception as e:
         return jsonify({'error': f'服务器错误:{e}'}), 500
+
+
+@app.route('/api/history')
+def api_history():
+    """返回历史记录 JSON"""
+    rows = db.list_notices(50)
+    return jsonify(rows)
+
+
+@app.route('/history')
+def history_page():
+    """历史记录页面"""
+    rows = db.list_notices(50)
+    items = ""
+    for r in rows:
+        hazards_parsed = []
+        try:
+            import json as _json
+            hazards_parsed = _json.loads(r["hazards"])
+        except Exception:
+            hazards_parsed = [r["hazards"]]
+        hazards_str = "、".join(hazards_parsed[:3])
+        source_label = "📷" if r["source"] == "photos" else "📝"
+        items += f"""
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>#{r["id"]} {source_label} {r["project"] or "未命名"}</strong>
+            <span style="color:#9ca3af;font-size:12px">{r["created_at"]}</span>
+          </div>
+          <div style="color:#6b7280;font-size:13px;margin-top:6px">{hazards_str}</div>
+          <details style="margin-top:8px">
+            <summary style="cursor:pointer;color:#2563eb;font-size:13px">查看通知全文</summary>
+            <pre style="background:#1f2937;color:#e5e7eb;padding:14px;border-radius:6px;font-size:12px;white-space:pre-wrap;margin-top:6px">{r["notice"]}</pre>
+          </details>
+        </div>"""
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>历史记录 · 智安通</title>
+<style>
+*{{box-sizing:border-box}}body{{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:32px auto;padding:0 18px;color:#1f2937}}
+h1{{font-size:24px}}a{{color:#2563eb;text-decoration:none}}a:hover{{text-decoration:underline}}
+.back{{display:inline-block;margin-bottom:20px;font-size:14px}}
+</style></head>
+<body>
+<a class="back" href="/">← 返回首页</a>
+<h1>📋 历史记录</h1>
+<p style="color:#9ca3af;font-size:14px">共 {len(rows)} 条通知</p>
+{items}
+</body></html>"""
 
 
 @app.route('/health')

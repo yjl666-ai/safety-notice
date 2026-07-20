@@ -43,3 +43,4 @@ notice_*.yaml
 *.bmp
 test_photos/
 main
+notices.db
