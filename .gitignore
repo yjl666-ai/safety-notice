@@ -36,4 +36,10 @@ get-pip.py
 # 应用生成 + 日志(不入库)
 ui.log
 notice.yaml
+notice_*.yaml
+*.jpg
+*.png
+*.webp
+*.bmp
+test_photos/
 main
