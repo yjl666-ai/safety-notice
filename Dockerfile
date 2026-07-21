@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用文件
+COPY db.py ./
 COPY app.py ./
 COPY ai_suggest.py ./
 COPY generate_notice.py ./
